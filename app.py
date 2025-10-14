@@ -164,6 +164,53 @@ def predict():
     except Exception as e:
         return jsonify({"error": "예측 중 오류 발생", "details": str(e)}), 500
 
+#레스트용,
+@app.route('/api/predict2/<string:model_type>', methods=['POST'])
+def predict2(model_type):
+    """
+    URL 경로에서 모델 타입을 받고, JSON 본문에서 'data'와 'period'를 받아 예측합니다.
+    """
+    try:
+        req_data = request.get_json()
+        input_data = req_data.get('data')
+        period = req_data.get('period')  # period도 검증을 위해 받습니다.
+
+        # 1. 필수 데이터 검증
+        if not all([input_data, period]):
+            return jsonify({"error": "요청 본문에 data와 period 정보가 모두 포함되어야 합니다."}), 400
+
+        # 2. 요청된 모델과 스케일러 선택 (URL에서 받은 model_type 사용)
+        model = models.get(model_type.upper())  # 대소문자 구분 없도록 .upper()
+        scaler = scalers.get(model_type.upper())
+
+        if not model or not scaler:
+            return jsonify({"error": f"'{model_type}' 모델을 서버에서 찾을 수 없습니다."}), 404
+
+        # 3. 'period' 값을 사용해 'data'의 길이 검증
+        period_days_map = {'1d': 1, '5d': 4}
+        expected_length = period_days_map.get(period)
+
+        if expected_length is None:
+            return jsonify({"error": f"지원되지 않는 기간입니다: {period}"}), 400
+
+        if len(input_data) != expected_length:
+            return jsonify({"error": f"데이터 길이가 잘못되었습니다. '{period}' 기간에는 {expected_length}일치 데이터가 필요합니다."}), 400
+
+        # 4. 예측 로직
+        input_np = np.array(input_data)
+        input_scaled = scaler.transform(input_np)
+        input_tensor = torch.Tensor(input_scaled).unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            prediction_scaled = model(input_tensor).item()
+
+        prediction = scaler.inverse_transform([[0, 0, 0, prediction_scaled]])[0][3]
+
+        return jsonify({"prediction": round(prediction, 2)})
+
+    except Exception as e:
+        return jsonify({"error": "예측 중 서버 오류가 발생했습니다.", "details": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
