@@ -68,7 +68,7 @@ def transform_image(image, normalize=False):
 # 웹페이지 렌더링
 @app.route("/")
 def index():
-    return render_template("index-복사본-cnn-이미지분류기.html")
+    return render_template("index-복사본-1-cnn-이미지분류기.html")
 
 # 이미지 업로드 및 분류 API (CNN)
 @app.route("/classify", methods=["POST"])
