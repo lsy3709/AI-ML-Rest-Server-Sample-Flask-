@@ -99,7 +99,7 @@ def classify_image_generic(model, normalize=False):
         confidence = probabilities[predicted_idx].item()
 
     return jsonify({
-        "class": class_names[predicted_idx],
+        "predicted_class": class_names[predicted_idx],
         "confidence": round(confidence * 100, 2)
     })
 
