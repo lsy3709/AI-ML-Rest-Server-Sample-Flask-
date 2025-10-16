@@ -62,11 +62,42 @@ def process_yolo(file_path, output_path, file_type):
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')  # 호환성 높은 H.264 코덱
-            out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
+            # FPS가 0이면 기본값 설정 (손상된 비디오 대응)
+            if fps <= 0:
+                fps = 30
+                print(f"⚠️ WARNING: FPS를 감지할 수 없어 기본값 {fps}로 설정합니다.")
 
-            if not out.isOpened():
-                print(f"🔴 ERROR: VideoWriter를 열 수 없습니다. 시스템에 FFmpeg가 설치되었는지 확인하세요.")
+            # Windows에서 안정적인 코덱 우선순위: mp4v > XVID > MJPG
+            codecs_to_try = [
+                ('mp4v', '.mp4'),  # MPEG-4 (가장 호환성 좋음)
+                ('XVID', '.avi'),  # Xvid (Windows 기본 지원)
+                ('MJPG', '.avi'),  # Motion JPEG (폴백용)
+            ]
+
+            out = None
+            for codec, ext in codecs_to_try:
+                try:
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    # 확장자가 다르면 임시 출력 경로 조정
+                    if not temp_output_path.endswith(ext):
+                        temp_output_path = os.path.splitext(temp_output_path)[0] + ext
+                        output_path = os.path.splitext(output_path)[0] + ext
+
+                    out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
+
+                    if out.isOpened():
+                        print(f"✅ VideoWriter 초기화 성공: 코덱={codec}, 해상도={width}x{height}, FPS={fps}")
+                        break
+                    else:
+                        print(f"⚠️ {codec} 코덱 실패, 다음 코덱 시도 중...")
+                        out.release()
+                        out = None
+                except Exception as e:
+                    print(f"⚠️ {codec} 코덱 오류: {e}")
+                    continue
+
+            if out is None or not out.isOpened():
+                print(f"🔴 ERROR: 모든 코덱 시도 실패. OpenCV 비디오 출력을 초기화할 수 없습니다.")
                 cap.release()
                 return
 
@@ -135,9 +166,15 @@ def predict(model_type):
         thread = threading.Thread(target=process_yolo, args=(file_path, output_path, file_type))
         thread.start()
 
+        # 전체 URL 반환 (리액트에서 직접 접근 가능)
+        result_url = request.host_url.rstrip('/') + url_for('serve_result', filename=output_filename)
+        status_url = request.host_url.rstrip('/') + url_for('get_status', filename=output_filename)
+
         return jsonify({
             "message": "YOLO 처리가 시작되었습니다.",
-            "output_filename": output_filename  # 클라이언트가 상태를 확인할 파일명
+            "output_filename": output_filename,
+            "result_url": result_url,  # 예: http://127.0.0.1:5000/results/result__6e5df66e.mp4
+            "status_url": status_url  # 예: http://127.0.0.1:5000/status/result__6e5df66e.mp4
         })
 
     # --- 이미지 분류 모델 처리 ---
