@@ -3,159 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask Server - Unified Image Classification</title>
-
-    <!-- ✅ CSS 파일 연결 -->
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
-
+    <title>AI Model Hub</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
 </head>
 <body>
+    <h1>AI Model Hub</h1>
+    <p>파일을 업로드하고, 원하는 AI 모델을 선택하여 예측을 실행하세요.</p>
 
-    <h1>Flask Server - Unified Image Classification</h1>
-    <p>팀별 모델과 YOLOv8을 사용하여 이미지 분류 및 객체 탐지를 수행할 수 있습니다.</p>
-
-    <!-- 🔹 공통 파일 업로드 UI -->
     <div class="upload-section">
-        <h3>Upload File</h3>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <input type="file" id="fileInput"  required>
-            <button type="submit">Upload</button>
-        </form>
-        <div id="loading" style="display: none;">Processing your file... Please wait!</div>
-        <div id="result"></div>
+        <h3>1. 파일 선택</h3>
+        <input type="file" id="fileInput" required>
     </div>
 
-    <!-- 🔹 모델 선택 UI -->
     <div class="upload-section">
-        <h3>Select Model</h3>
-        <button onclick="uploadFile('team1')">Predict (Team1 - 동물)</button>
-        <button onclick="uploadFile('team2')">Predict (Team2 - 재활용)</button>
-        <button onclick="uploadFile('team3')">Predict (Team3 - 공구)</button>
-        <button onclick="uploadFile('yolo')">Predict (YOLOv8 - 객체 탐지)</button>
+        <h3>2. 모델 선택 및 예측 실행</h3>
+        <button onclick="runPrediction('team1')">동물 분류</button>
+        <button onclick="runPrediction('team2')">재활용품 분류</button>
+        <button onclick="runPrediction('team3')">공구 분류</button>
+        <button onclick="runPrediction('yolo')">YOLO 객체 탐지</button>
     </div>
 
-    <!-- 🔹 업로드된 파일 미리보기 -->
-    <div class="preview-container">
-        <img id="preview-image" src="" style="display: none; max-width: 300px; margin-top: 10px; border: 1px solid #ddd;">
+    <div id="loading" style="display: none;">
+        <p>처리 중입니다... 잠시만 기다려 주세요.</p>
+        <div class="loader"></div>
+    </div>
+
+    <div class="result-container">
+        <h3>결과</h3>
+        <div id="result">결과가 여기에 표시됩니다.</div>
+        <div class="preview-container">
+            <img id="preview-image" src="" style="display: none;">
+            <video id="preview-video" src="" style="display: none;" controls></video>
+        </div>
     </div>
 
     <script>
-        const form = document.getElementById('uploadForm');
-        const fileInput = document.getElementById('fileInput');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
-        const previewImage = document.getElementById('preview-image');
-        const socket = io();
-
-        let uploadedFile = null; // 업로드된 파일 저장
-
-        // 🔹 파일 업로드 처리
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-
+        // 모델 예측 실행 함수
+        function runPrediction(modelType) {
+            const fileInput = document.getElementById('fileInput');
             if (fileInput.files.length === 0) {
-                alert("파일을 선택하세요.");
+                alert("먼저 파일을 선택하세요.");
                 return;
             }
+            const file = fileInput.files[0];
+            displayPreview(file); // 예측 시작 시 미리보기 표시
 
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            uploadedFile = fileInput.files[0]; // 파일 저장
-
-            loading.style.display = 'block';
-            result.innerHTML = '';
-
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData,
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-                alert(data.error);
-                loading.style.display = 'none';
-            } else {
-                console.log("File uploaded successfully.");
-                loading.innerHTML = 'File uploaded successfully.'
-
-            }
-        });
-
-
-
-        // 🔹 이미지 분류 모델 예측 요청 (AJAX)
-        function uploadFile(modelType) {
-            if (!uploadedFile) {
-                alert("먼저 파일을 업로드하세요.");
-                return;
-            }
-
-            let formData = new FormData();
-            formData.append("image", uploadedFile);
-
-            let endpoint = modelType === "yolo" ? "/predict/yolo" : `/predict/${modelType}`;
+            formData.append("image", file);
 
             $.ajax({
-                url: endpoint,
+                url: `/predict/${modelType}`, // 통합된 API 경로 사용
                 type: "POST",
                 data: formData,
                 contentType: false,
                 processData: false,
                 beforeSend: function() {
-                    loading.style.display = 'block';
-                    result.innerHTML = '';
+                    $('#loading').show();
+                    $('#result').html('');
                 },
                 success: function(response) {
-                    console.log(response);
-                    loading.style.display = 'none';
-
                     if (modelType === "yolo") {
-                        console.log("(modelTyp : yolo...")
-                        console.log("(modelTyp : response.url...",response.url)
-                        // YOLO 모델은 처리된 이미지 URL을 반환
-                        result.innerHTML = `<p>처리된 이미지 결과:</p><a href="${response.url}" target="_blank">결과 보기</a>`;
-                        previewImage.src = response.url;
-                        previewImage.style.display = "block";
+                        // YOLO는 폴링 시작
+                        $('#loading p').text('YOLO 모델이 영상을 처리 중입니다...');
+                        pollForResult(response.output_filename);
                     } else {
-                        // 이미지 분류 모델 결과 표시
-                        result.innerHTML = `
-                            <p>파일명: ${response.filename}</p>
-                            <p>예측 결과: <strong>${response.predicted_class}</strong></p>
-                            <p>정확도: ${response.confidence}</p>
-                        `;
+                        // 이미지 분류 결과는 바로 표시
+                        $('#loading').hide();
+                        $('#result').html(`
+                            <p><strong>파일명:</strong> ${response.filename}</p>
+                            <p><strong>예측 결과:</strong> ${response.predicted_class}</p>
+                            <p><strong>정확도:</strong> ${response.confidence}</p>
+                        `);
                     }
                 },
-                error: function(error) {
-                    console.error("Error:", error);
-                    result.innerHTML = "<p style='color:red;'>예측 실패</p>";
-                    loading.style.display = 'none';
+                error: function(jqXHR) {
+                    $('#loading').hide();
+                    const errorMsg = jqXHR.responseJSON ? jqXHR.responseJSON.error : "알 수 없는 오류 발생";
+                    $('#result').html(`<p style='color:red;'>예측 실패: ${errorMsg}</p>`);
                 }
             });
-
-            // 이미지 미리보기
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                previewImage.src = e.target.result;
-                previewImage.style.display = "block";
-            };
-            reader.readAsDataURL(uploadedFile);
         }
 
-         // 🔹 YOLOv8 비동기 처리 결과 수신 (WebSocket)
-        socket.on('file_processed', (data) => {
-            loading.style.display = 'none';
-            result.innerHTML = `
-                <h2>Processed File</h2>
-                ${data.url.endsWith('.mp4')
-                    ? `<a href="${data.url}" download>Download Video</a>`
-                    : `<div><a href="${data.url}" download>Download Image</a></div><img src="${data.url}" alt="Processed Image" style="max-width: 100%; height: auto;">`
-                }
-            `;
-        });
-    </script>
+        // YOLO 결과 폴링 함수
+        function pollForResult(filename) {
+            const interval = setInterval(() => {
+                $.get(`/status/${filename}`)
+                    .done(function(response) {
+                        if (response.status === 'complete') {
+                            clearInterval(interval);
+                            $('#loading').hide();
+                            const isVideo = response.url.toLowerCase().endsWith('.mp4');
+                            $('#result').html(`
+                                <p><strong>처리 완료!</strong></p>
+                                <a href="${response.url}" download>결과 다운로드</a>
+                            `);
+                            if (isVideo) {
+                                $('#preview-video').attr('src', response.url).show();
+                                $('#preview-image').hide();
+                            } else {
+                                $('#preview-image').attr('src', response.url).show();
+                                $('#preview-video').hide();
+                            }
+                        }
+                    })
+                    .fail(function() {
+                        clearInterval(interval);
+                        $('#loading').hide();
+                        $('#result').html("<p style='color:red;'>결과 확인 중 오류 발생</p>");
+                    });
+            }, 2000); // 2초마다 상태 확인
+        }
 
+        // 파일 미리보기 함수
+        function displayPreview(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const isVideo = file.type.startsWith('video/');
+                if (isVideo) {
+                    $('#preview-video').attr('src', e.target.result).show();
+                    $('#preview-image').hide();
+                } else {
+                    $('#preview-image').attr('src', e.target.result).show();
+                    $('#preview-video').hide();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
 </body>
 </html>
