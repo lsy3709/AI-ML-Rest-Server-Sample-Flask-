@@ -376,6 +376,10 @@ def predict2(model_type):
 
 # 7. conda 환경에서, 한번에 라이브러리 설치 하기.
 # conda env create -f environment.yml
+
+# 콘다 환경에서 라이브러리 설치하는 예제
+# conda install -c conda-forge [라이브러리 이름]
+# conda install -c conda-forge ultralytics
 # ==============================================================================
 if __name__ == '__main__':
     from waitress import serve
