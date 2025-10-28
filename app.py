@@ -373,6 +373,9 @@ def predict2(model_type):
 # 6. Flask 앱 실행
 # 플러터 연결시,
 # pip install waitress
+
+# 7. conda 환경에서, 한번에 라이브러리 설치 하기.
+# conda env create -f environment.yml
 # ==============================================================================
 if __name__ == '__main__':
     from waitress import serve
