@@ -379,6 +379,10 @@ def predict2(model_type):
 # pip 환경에서 모듈 설치하기.
 # pip freeze > requirements.txt
 
+# 충돌시, 가상환경 새로 생성 및 삭제,
+# conda env remove -n Pytorch
+# conda create -n Pytorch python=3.9
+
 # 콘다 환경에서 라이브러리 설치하는 예제
 # conda install -c conda-forge [라이브러리 이름]
 # conda install -c conda-forge ultralytics
