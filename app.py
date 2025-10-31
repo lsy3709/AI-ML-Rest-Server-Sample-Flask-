@@ -377,6 +377,8 @@ def predict2(model_type):
 # 7. conda 환경에서, 한번에 라이브러리 설치 하기.
 # conda env create -f environment.yml
 # pip 환경에서 모듈 설치하기.
+# pip install -r requirements.txt
+# pip 환경에서 모듈 설치 파일 만들기.
 # pip freeze > requirements.txt
 
 # 충돌시, 가상환경 새로 생성 및 삭제,
